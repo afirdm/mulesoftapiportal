@@ -116,9 +116,11 @@
           <div class="accordion-inner">
               <pre><code>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
 
-&lt;mule xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:api-gateway="http://www.mulesoft.org/schema/mule/api-gateway" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd 
+&lt;mule xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:api-gateway="http://www.mulesoft.org/schema/mule/api-gateway" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd 
 http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
-http://www.mulesoft.org/schema/mule/api-gateway http://www.mulesoft.org/schema/mule/api-gateway/current/mule-api-gateway.xsd"&gt;
+http://www.mulesoft.org/schema/mule/api-gateway http://www.mulesoft.org/schema/mule/api-gateway/current/mule-api-gateway.xsd
+http://www.mulesoft.org/schema/mule/xml-module http://www.mulesoft.org/schema/mule/xml-module/current/mule-xml-module.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd"&gt;
     &lt;http:listener-config name="mulesoftapi-httpListenerConfig"&gt; 
         &lt;http:listener-connection host="0.0.0.0" port="8081"/&gt; 
     &lt;/http:listener-config&gt;  
@@ -326,6 +328,7 @@ payload map ( payload01 , indexOfPayload01 ) -&gt; {
         &lt;/ee:transform&gt; 
     &lt;/flow&gt;  
     &lt;flow name="post:\order:application\json:mulesoftapi-config"&gt; 
+        &lt;json:validate-schema doc:name="Validate schema" doc:id="7908b40d-9a15-4cc5-aa5f-2b12cb79c0a8" schema="order.json"/&gt;  
         &lt;db:insert doc:name="Create Order" doc:id="60e636dc-1b99-432d-bd37-46e9b9564d3e" config-ref="postgres" autoGenerateKeys="true" target="tx_number" targetValue="#[payload.generatedKeys[0]]"&gt; 
             &lt;db:sql&gt;&lt;![CDATA[INSERT INTO ORDERS_HISTORY (ORDER_DATE,ACTION,STATUS,SYMBOL,QUANTITY,PRICE) 
 
@@ -344,7 +347,25 @@ VALUES (current_timestamp,:ACTION,'PENDING',:SYMBOL,:QUANTITY,:PRICE)]]&gt;    &
             &lt;db:auto-generated-keys-column-names&gt; 
                 &lt;db:auto-generated-keys-column-name value="tx_number"/&gt; 
             &lt;/db:auto-generated-keys-column-names&gt; 
-        &lt;/db:insert&gt; 
+        &lt;/db:insert&gt;  
+        &lt;error-handler&gt; 
+            &lt;on-error-propagate type="JSON:SCHEMA_NOT_HONOURED"&gt; 
+                &lt;ee:transform&gt; 
+                    &lt;ee:message&gt; 
+                        &lt;ee:set-payload&gt;&lt;![CDATA[%dw 2.0
+
+output application/json
+
+---
+
+{error: "Json content is not compliant with schema"}]]&gt; &lt;/ee:set-payload&gt;
+                    &lt;/ee:message&gt;  
+                    &lt;ee:variables&gt; 
+                        &lt;ee:set-variable variableName="httpStatus"&gt;&lt;![CDATA[400]]&gt;  &lt;/ee:set-variable&gt; 
+                    &lt;/ee:variables&gt; 
+                &lt;/ee:transform&gt; 
+            &lt;/on-error-propagate&gt; 
+        &lt;/error-handler&gt; 
     &lt;/flow&gt; 
 &lt;/mule&gt;
 </code></pre>
@@ -674,6 +695,7 @@ payload map ( payload01 , indexOfPayload01 ) -&gt; {
                     <pre><code>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
 
 &lt;flow name="post:\order:application\json:mulesoftapi-config"&gt;  
+    &lt;json:validate-schema doc:name="Validate schema" doc:id="7908b40d-9a15-4cc5-aa5f-2b12cb79c0a8" schema="order.json"&gt; &lt;/json:validate-schema&gt;  
     &lt;db:insert doc:name="Create Order" doc:id="60e636dc-1b99-432d-bd37-46e9b9564d3e" config-ref="postgres" autoGenerateKeys="true" target="tx_number" targetValue="#[payload.generatedKeys[0]]"&gt;  
         &lt;db:sql&gt;&lt;![CDATA[INSERT INTO ORDERS_HISTORY (ORDER_DATE,ACTION,STATUS,SYMBOL,QUANTITY,PRICE) 
 
@@ -692,7 +714,25 @@ VALUES (current_timestamp,:ACTION,'PENDING',:SYMBOL,:QUANTITY,:PRICE)]]&gt;    &
         &lt;db:auto-generated-keys-column-names&gt; 
             &lt;db:auto-generated-keys-column-name value="tx_number"/&gt; 
         &lt;/db:auto-generated-keys-column-names&gt; 
-    &lt;/db:insert&gt; 
+    &lt;/db:insert&gt;  
+    &lt;error-handler&gt; 
+        &lt;on-error-propagate type="JSON:SCHEMA_NOT_HONOURED"&gt; 
+            &lt;ee:transform &gt;  
+                &lt;ee:message&gt; 
+                    &lt;ee:set-payload&gt;&lt;![CDATA[%dw 2.0
+
+output application/json
+
+---
+
+{error: "Json content is not compliant with schema"}]]&gt; &lt;/ee:set-payload&gt;
+                &lt;/ee:message&gt;  
+                &lt;ee:variables&gt; 
+                    &lt;ee:set-variable variableName="httpStatus"&gt;&lt;![CDATA[400]]&gt;  &lt;/ee:set-variable&gt; 
+                &lt;/ee:variables&gt; 
+            &lt;/ee:transform&gt; 
+        &lt;/on-error-propagate&gt; 
+    &lt;/error-handler&gt; 
 &lt;/flow&gt;
 </code></pre>
 
